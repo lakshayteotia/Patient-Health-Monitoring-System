@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wearable Health Monitor - ESP32 IoT Medical Dashboard</title>
+  
+  <!-- Allowlisted Tailwind CSS for Antigravity & standalone viewing -->
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  
+  <!-- Custom Theme & Animations -->
+  <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body class="bg-[#0B1220] text-[#F8FAFC] min-h-screen flex flex-col font-sans antialiased selection:bg-cyan-500 selection:text-slate-900">
+
+  <!-- ==========================================
+       1. HEADER & TOP TELEMETRY BAR
+       ========================================== -->
+  <header class="sticky top-0 z-30 bg-[#0B1220]/90 backdrop-blur-md border-b border-slate-800 px-4 lg:px-8 py-3.5 shadow-lg">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+      
+      <!-- Brand & Project Title -->
+      <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-teal-400 flex items-center justify-center shadow-lg shadow-cyan-500/20 flex-shrink-0">
+            <!-- ECG Pulse Wave Icon -->
+            <svg class="w-6 h-6 text-[#0B1220]" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="font-extrabold text-lg tracking-tight text-white">Wearable Health Monitor</h1>
+              <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">ESP32 IoT</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+              <span id="header-current-clock" class="font-mono text-slate-300 font-medium">--:--:--</span>
+              <span class="text-slate-600">&bull;</span>
+              <span class="flex items-center gap-1.5 text-[11px] text-cyan-400 font-mono">
+                <span id="rx-packet-indicator" class="w-2 h-2 rounded-full bg-cyan-400 opacity-20 transition-all inline-block" title="Packet Received Indicator"></span>
+                <span>Live Telemetry</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mobile Controls Toggle -->
+        <div class="flex items-center gap-2 md:hidden">
+          <button id="btn-theme-toggle-mob" onclick="toggleTheme()" class="p-2 rounded-lg bg-slate-800 text-slate-300">
+            🌓
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Device Status, Wi-Fi, Battery, Last Data -->
+      <div class="flex flex-wrap items-center justify-center md:justify-end gap-2.5 sm:gap-3 w-full md:w-auto text-xs">
+        
+        <!-- Device Status Pill -->
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#111C2E] border border-slate-800">
+          <span class="text-slate-400">Device:</span>
+          <span id="header-conn-status" class="status-pill status-pill-normal">ONLINE</span>
+        </div>
+
+        <!-- ESP32 Hardware Status -->
+        <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#111C2E] border border-slate-800">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 beacon-online"></span>
+          <span class="text-slate-300 font-mono">ESP32-WROOM</span>
+        </div>
+
+        <!-- Wi-Fi Signal Strength -->
+        <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#111C2E] border border-slate-800">
+          <!-- Wi-Fi Icon -->
+          <svg class="w-4 h-4 text-teal-400" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M17.778 8.222c-4.296-4.296-11.26-4.296-15.556 0A1 1 0 01.808 6.808c5.076-5.077 13.308-5.077 18.384 0a1 1 0 01-1.414 1.414zM14.95 11.05a7 7 0 00-9.9 0 1 1 0 01-1.414-1.414 9 9 0 0112.728 0 1 1 0 01-1.414 1.414zm-2.829 2.828a3 3 0 00-4.242 0 1 1 0 01-1.415-1.414 5 5 0 017.072 0 1 1 0 01-1.415 1.414zM9 16a1 1 0 112 0 1 1 0 01-2 0z" clip-rule="evenodd"/>
+          </svg>
+          <span id="header-wifi-rssi" class="font-mono text-slate-200 font-semibold">-62 dBm</span>
+        </div>
+
+        <!-- Battery Percentage -->
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#111C2E] border border-slate-800">
+          <div class="w-6 h-3 rounded-sm border border-slate-400 p-0.5 flex items-center">
+            <div id="header-battery-bar" class="h-full bg-emerald-400 rounded-2xs transition-all" style="width: 88%"></div>
+          </div>
+          <span id="header-battery-pct" class="font-mono text-slate-200 font-bold">88%</span>
+        </div>
+
+        <!-- Last Sync Time -->
+        <div class="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#111C2E] border border-slate-800 text-slate-400">
+          <span>Synced:</span>
+          <span id="header-last-sync" class="text-cyan-400 font-mono font-medium">Just now</span>
+        </div>
+
+        <!-- Action Buttons: Theme, Sound, Settings -->
+        <div class="flex items-center gap-1.5 pl-1">
+          <button id="btn-theme-toggle" class="btn-pill btn-outline px-2.5 py-1.5" title="Toggle Light/Dark Theme">
+            <span id="theme-icon" class="text-sm">🌓</span>
+          </button>
+          
+          <button id="btn-sound-toggle" class="btn-pill btn-outline px-2.5 py-1.5" title="Toggle Medical Audio Alerts">
+            <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+            </svg>
+            <span class="text-xs hidden sm:inline">Audio</span>
+          </button>
+
+          <button id="btn-open-settings" class="btn-pill btn-primary px-3 py-1.5" title="System Settings & Warning Thresholds">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            <span class="hidden sm:inline">Settings</span>
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ==========================================
+       TOP CONTROL STRIP & NOTICE BANNER
+       ========================================== -->
+  <div class="max-w-7xl mx-auto px-4 lg:px-8 pt-4 w-full">
+    
+    <!-- Educational / Prototype Medical Disclaimer -->
+    <div class="mb-4 px-4 py-2.5 rounded-xl bg-cyan-950/40 border border-cyan-800/40 flex items-center justify-between gap-3 text-xs text-cyan-200">
+      <div class="flex items-center gap-2.5">
+        <span class="text-base flex-shrink-0">⚠️</span>
+        <p>
+          <strong class="font-bold text-cyan-300">Prototype Health Monitoring Notice:</strong>
+          These sensor measurements are collected from MAX30100 & DS18B20 sensors on an ESP32 hardware prototype for educational and monitoring purposes. This dashboard is not a certified medical device and does not constitute a clinical medical diagnosis.
+        </p>
+      </div>
+      <button id="btn-generate-report" class="btn-pill btn-outline text-xs px-2.5 py-1 whitespace-nowrap hidden sm:inline-flex bg-slate-900/50">
+        🖨️ Clinical Report
+      </button>
+    </div>
+
+    <!-- Quick Mode Controller Bar (Simulator vs Real ESP32, Scenarios, Wearer) -->
+    <div class="health-card p-3 mb-6 flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Wearer Profile Selection -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-slate-400 font-semibold uppercase">Subject:</span>
+        <select id="profile-selector" class="bg-[#16253B] text-slate-200 text-xs font-medium rounded-lg px-2.5 py-1.5 border border-slate-700 focus:outline-none focus:border-cyan-400">
+          <option value="P-1042">Subject Alpha (Garv K. - Age 23)</option>
+          <option value="P-2088">Subject Beta (Senior Patient - Age 68)</option>
+          <option value="P-3011">Subject Gamma (Athlete Track - Age 29)</option>
+        </select>
+      </div>
+
+      <!-- Telemetry Source Switcher -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-slate-400 font-semibold uppercase">Source:</span>
+        <select id="connection-mode-select" class="bg-[#16253B] text-slate-200 text-xs font-medium rounded-lg px-2.5 py-1.5 border border-slate-700 focus:outline-none focus:border-cyan-400">
+          <option value="simulator">🎮 Real-Time Simulator (Offline Demo)</option>
+          <option value="websocket">🌐 ESP32 WebSocket (Wi-Fi)</option>
+          <option value="serial">🔌 Web Serial (USB Cable)</option>
+          <option value="http">📡 ESP32 REST HTTP Polling</option>
+        </select>
+        
+        <button id="btn-connect-serial" class="btn-pill btn-primary text-xs px-2.5 py-1.5 hidden">
+          Connect USB
+        </button>
+      </div>
+
+      <!-- Simulation Scenario (For easy demonstration) -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-slate-400 font-semibold uppercase">Simulate Condition:</span>
+        <select id="simulation-scenario-select" class="bg-[#16253B] text-slate-200 text-xs font-medium rounded-lg px-2.5 py-1.5 border border-slate-700 focus:outline-none focus:border-cyan-400">
+          <option value="normal">Normal Baseline (75 BPM, 98% SpO₂, 36.6°C)</option>
+          <option value="exercise">Post-Exercise / Tachycardia (138 BPM)</option>
+          <option value="hypoxia">Hypoxia / Low Oxygen (88% SpO₂ Critical)</option>
+          <option value="fever">High Fever / Hyperthermia (38.9°C)</option>
+          <option value="sensor_off">Sensor Disconnect (Finger Removed)</option>
+          <option value="random">Dynamic Random Physiological Drift</option>
+        </select>
+      </div>
+
+      <!-- Recording Badge / Trigger -->
+      <div class="flex items-center gap-2">
+        <div id="recording-active-badge" class="hidden items-center gap-2 px-2.5 py-1 rounded bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-mono font-bold">
+          <span class="w-2 h-2 rounded-full bg-red-500 beacon-online"></span>
+          <span>REC <span id="recording-duration-timer">00:00</span></span>
+          <span id="recording-samples-count" class="text-[10px] text-slate-300">0 pts</span>
+        </div>
+        <button id="btn-start-record" class="btn-pill btn-outline text-xs px-3 py-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10">
+          ⏺ Start Recording
+        </button>
+        <button id="btn-stop-record" class="btn-pill btn-primary text-xs px-3 py-1.5 bg-red-600 text-white hover:bg-red-500 hidden">
+          ⏹ Stop Recording
+        </button>
+      </div>
+
+    </div>
+
+    <!-- ==========================================
+         4. PROMINENT OVERALL HEALTH STATUS
+         ========================================== -->
+    <div id="overall-status-container" class="health-card p-4 mb-6 border-l-4 border-l-emerald-500 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+          <svg class="w-7 h-7 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs uppercase tracking-wider text-slate-400 font-bold">Overall System Health:</span>
+            <span id="overall-status-badge" class="px-3 py-0.5 rounded-full text-xs font-extrabold uppercase border bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+              NORMAL
+            </span>
+          </div>
+          <p id="overall-status-message" class="text-sm font-medium text-slate-200 mt-0.5">
+            All vital biosignals are within target baseline limits.
+          </p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-xs font-mono text-slate-400">
+        <span class="px-2 py-1 rounded bg-[#16253B]">Threshold Evaluation: Active</span>
+        <span class="px-2 py-1 rounded bg-[#16253B]">Sampling: 1000ms</span>
+      </div>
+    </div>
+
+    <!-- ==========================================
+         2. MAIN HEALTH CARDS (HR, SpO2, Temp)
+         ========================================== -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      
+      <!-- CARD 1: HEART RATE -->
+      <div class="health-card p-6 relative overflow-hidden group">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2.5">
+            <div id="heart-pulse-icon" class="w-10 h-10 rounded-xl bg-red-500/15 flex items-center justify-center text-red-500 animate-heartbeat">
+              <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+              </svg>
+            </div>
+            <div>
+              <h2 class="font-bold text-sm text-slate-300 uppercase tracking-wider">Heart Rate</h2>
+              <span class="text-xs text-slate-400">MAX30100 Optical</span>
+            </div>
+          </div>
+          <span id="hr-status-badge" class="status-pill status-pill-normal">NORMAL</span>
+        </div>
+
+        <!-- Current Value Display -->
+        <div class="flex items-baseline gap-2 my-2">
+          <span id="hr-value" class="text-5xl font-extrabold tracking-tight text-white font-mono">75</span>
+          <span class="text-lg font-bold text-red-400">BPM</span>
+        </div>
+
+        <!-- Normal Range Target Indicator -->
+        <div class="flex items-center justify-between text-xs text-slate-400 mb-4 pt-1">
+          <span>Target: 60 - 100 BPM</span>
+          <span class="text-emerald-400 font-semibold">Resting Rhythm</span>
+        </div>
+
+        <!-- Min, Max, Average Stats Footer -->
+        <div class="pt-4 border-t border-slate-800/80 grid grid-cols-3 gap-2 text-center">
+          <div class="p-2 rounded-lg bg-[#16253B]/50">
+            <div class="text-[10px] uppercase text-slate-400 font-bold">Min</div>
+            <div id="hr-min" class="text-xs font-mono font-bold text-slate-200 mt-0.5">72 BPM</div>
+          </div>
+          <div class="p-2 rounded-lg bg-[#16253B]/50">
+            <div class="text-[10px] uppercase text-slate-400 font-bold">Max</div>
+            <div id="hr-max" class="text-xs font-mono font-bold text-slate-200 mt-0.5">78 BPM</div>
+          </div>
+          <div class="p-2 rounded-lg bg-[#16253B]/50">
+            <div class="text-[10px] uppercase text-slate-400 font-bold">Average</div>
+            <div id="hr-avg" class="text-xs font-mono font-bold text-slate-200 mt-0.5">75 BPM</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD 2: SpO2 OXYGEN SATURATION -->
+      <div class="health-card p-6 relative overflow-hidden group">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center text-blue-400">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+              </svg>
+            </div>
+            <div>
+              <h2 class="font-bold text-sm text-slate-300 uppercase tracking-wider">Blood Oxygen</h2>
+              <span class="text-xs text-slate-400">SpO₂ Photoplethysmogram</span>
+            </div>
+          </div>
+          <span id="spo2-status-badge" class="status-pill status-pill-normal">NORMAL</span>
+        </div>
+
+        <!-- Gauge + Value Flex Row -->
+        <div class="flex items-center justify-between my-2">
+          <div>
+            <div class="flex items-baseline gap-1.5">
+              <span id="spo2-value" class="text-5xl font-extrabold tracking-tight text-white font-mono">98.4</span>
+              <span class="text-lg font-bold text-blue-400">%</span>
+            </div>
+            <div class="text-xs text-slate-400 mt-1">Target: &ge; 95%</div>
+            <div class="text-[11px] text-teal-400 font-mono mt-0.5">Perfusion: 4.2% (Good)</div>
+          </div>
+
+          <!-- Circular SVG Percentage Gauge -->
+          <div class="w-24 h-24 relative flex items-center justify-center flex-shrink-0">
+            <svg viewBox="0 0 36 36" class="circular-chart">
+              <path class="circle-bg"
+                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+              />
+              <path id="spo2-circle-progress" class="circle-progress"
+                stroke="#3B82F6"
+                stroke-dasharray="98.4, 100"
+                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+              />
+            </svg>
+            <span class="absolute text-[11px] font-mono font-bold text-slate-300">O₂</span>
+          </div>
+        </div>
+
+        <!-- Min, Max Stats Footer -->
+        <div class="pt-4 border-t border-slate-800/80 grid grid-cols-2 gap-2 text-center">
+          <div class="p-2 rounded-lg bg-[#16253B]/50">
+            <div class="text-[10px] uppercase text-slate-400 font-bold">Minimum SpO₂</div>
+            <div id="spo2-min" class="text-xs font-mono font-bold text-slate-200 mt-0.5">98.0%</div>
+          </div>
+          <div class="p-2 rounded-lg bg-[#16253B]/50">
+            <div class="text-[10px] uppercase text-slate-400 font-bold">Maximum SpO₂</div>
+            <div id="spo2-max" class="text-xs font-mono font-bold text-slate-200 mt-0.5">99.0%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD 3: BODY TEMPERATURE -->
+      <div class="health-card p-6 relative overflow-hidden group">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center text-amber-400">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+              </svg>
+            </div>
+            <div>
+              <h2 class="font-bold text-sm text-slate-300 uppercase tracking-wider">Body Temperature</h2>
+              <span class="text-xs text-slate-400">DS18B20 Contact Probe</span>
+            </div>
+          </div>
+          <span id="temp-status-badge" class="status-pill status-pill-normal">NORMAL</span>
+        </div>
+
+        <!-- Current Value Display & Unit Switcher -->
+        <div class="flex items-center justify-between my-2">
+          <div class="flex items-baseline gap-1.5">
+            <span id="temp-value" class="text-5xl font-extrabold tracking-tight text-white font-mono">36.6</span>
+            <span id="temp-unit-badge" class="text-2xl font-bold text-amber-400">°C</span>
+          </div>
+          <button id="btn-temp-unit-toggle" class="btn-pill btn-outline text-xs px-2.5 py-1">
+            Switch to °F
+          </button>
+        </div>
+
+        <!-- Thermometer Progress Bar Gauge -->
+        <div class="my-3">
+          <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+            <span>Hypo &lt;35.5</span>
+            <span class="text-emerald-400 font-semibold">Normal 36.1 - 37.2</span>
+            <span>Fever &gt;37.8</span>
+          </div>
+          <div class="w-full h-2.5 rounded-full bg-slate-800 overflow-hidden relative">
+            <div id="temp-gauge-bar" class="h-full bg-emerald-500 rounded-full transition-all" style="width: 45%"></div>
+          </div>
+        </div>
+
+        <!-- Min, Max, Average Stats Footer -->
+        <div class="pt-4 border-t border-slate-800/80 grid grid-cols-3 gap-2 text-center">
+          <div class="p-2 rounded-lg bg-[#16253B]/50">
+            <div class="text-[10px] uppercase text-slate-400 font-bold">Min</div>
+            <div id="temp-min" class="text-xs font-mono font-bold text-slate-200 mt-0.5">36.5°C</div>
+          </div>
+          <div class="p-2 rounded-lg bg-[#16253B]/50">
+            <div class="text-[10px] uppercase text-slate-400 font-bold">Max</div>
+            <div id="temp-max" class="text-xs font-mono font-bold text-slate-200 mt-0.5">36.8°C</div>
+          </div>
+          <div class="p-2 rounded-lg bg-[#16253B]/50">
+            <div class="text-[10px] uppercase text-slate-400 font-bold">Average</div>
+            <div id="temp-avg" class="text-xs font-mono font-bold text-slate-200 mt-0.5">36.6°C</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ==========================================
+         ADVANCED REAL-TIME HARDWARE & WAVEFORM ROW
+         Live PPG Waveform & Wearable OLED Display
+         ========================================== -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      
+      <!-- PPG Pulse Waveform Canvas (2 Columns on Desktop) -->
+      <div class="health-card p-5 lg:col-span-2">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 beacon-online"></span>
+            <h3 class="font-bold text-sm text-slate-200">PPG Pulse Wave</h3>
+          </div>
+          
+          <div class="flex items-center gap-2 text-xs">
+            <!-- Gain Selector -->
+            <label class="text-slate-400">Gain:</label>
+            <select id="ppg-gain-select" class="bg-[#16253B] text-slate-200 rounded px-2 py-0.5 border border-slate-700 text-xs">
+              <option value="1.0">1.0x</option>
+              <option value="1.5">1.5x</option>
+              <option value="2.0">2.0x</option>
+            </select>
+            <button id="btn-ppg-freeze" class="btn-pill btn-outline text-xs px-2.5 py-1">
+              FREEZE
+            </button>
+          </div>
+        </div>
+        
+        <!-- Oscilloscope Canvas -->
+        <canvas id="ppg-canvas" class="ppg-canvas"></canvas>
+        <div class="flex items-center justify-between text-[11px] text-slate-400 mt-2 font-mono">
+          <span>&larr; Systolic Peak &bull; Dicrotic Notch &bull; Diastolic Wave</span>
+          <span class="text-cyan-400 font-semibold">Sampling: 50 Hz Hardware FIFO</span>
+        </div>
+      </div>
+
+      <!-- OLED 128x64 Wearable Display Simulator (1 Column) -->
+      <div class="health-card p-5 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-bold text-sm text-slate-200 flex items-center gap-2">
+              <span>⌚ Wearable OLED Screen</span>
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300">SSD1306 0.96"</span>
+            </h3>
+            <span class="text-xs text-slate-400 font-mono">I2C 0x3C</span>
+          </div>
+          <p class="text-xs text-slate-400 mb-3">
+            Real-time visual duplicate of the monochrome screen mounted on the user's wristband:
+          </p>
+        </div>
+
+        <div class="flex items-center justify-center p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+          <canvas id="oled-canvas" class="oled-screen rounded" style="width: 230px; height: 115px;"></canvas>
+        </div>
+
+        <div class="flex items-center justify-between text-[11px] text-slate-400 mt-2 font-mono">
+          <span>Resolution: 128 &times; 64 px</span>
+          <span class="text-emerald-400 font-semibold">Active Sync: 100%</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ==========================================
+         3. REAL-TIME GRAPHS WITH TIME RANGE & ZOOM
+         ========================================== -->
+    <div class="mb-8">
+      
+      <!-- Graph Header & Control Bar -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div>
+          <h2 class="font-bold text-lg text-white">Interactive Biosignal Telemetry Trends</h2>
+          <p class="text-xs text-slate-400">Time-series tracking with configurable threshold boundaries &amp; hover crosshair tooltips</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <!-- Time Range Selector Buttons -->
+          <div class="flex items-center rounded-lg bg-[#111C2E] border border-slate-800 p-0.5">
+            <button class="time-range-btn px-2.5 py-1 rounded text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white" data-seconds="60">1m</button>
+            <button class="time-range-btn px-2.5 py-1 rounded text-xs font-semibold bg-cyan-500 text-slate-900" data-seconds="300">5m</button>
+            <button class="time-range-btn px-2.5 py-1 rounded text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white" data-seconds="1800">30m</button>
+            <button class="time-range-btn px-2.5 py-1 rounded text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white" data-seconds="3600">1h</button>
+            <button class="time-range-btn px-2.5 py-1 rounded text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white" data-seconds="86400">24h</button>
+          </div>
+
+          <!-- Zoom In / Out / Reset -->
+          <div class="flex items-center rounded-lg bg-[#111C2E] border border-slate-800 p-0.5">
+            <button id="btn-zoom-in" class="px-2 py-1 text-slate-300 hover:text-white font-bold" title="Zoom In">+</button>
+            <button id="btn-zoom-out" class="px-2 py-1 text-slate-300 hover:text-white font-bold" title="Zoom Out">&minus;</button>
+            <button id="btn-zoom-reset" class="px-2.5 py-1 text-slate-300 hover:text-cyan-400 text-xs font-semibold" title="Reset Zoom">Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Graph 1: Heart Rate vs Time -->
+      <div class="health-card p-5 mb-5">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-[#EF4444]"></span>
+            <h3 class="font-bold text-sm text-slate-200">Heart Rate vs. Time (BPM)</h3>
+          </div>
+          <span class="text-xs text-slate-400 font-mono">Hover to inspect point &bull; Normal: 60 - 100 BPM</span>
+        </div>
+        <canvas id="chart-hr" class="chart-canvas"></canvas>
+      </div>
+
+      <!-- Graph 2: SpO2 vs Time -->
+      <div class="health-card p-5 mb-5">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-[#3B82F6]"></span>
+            <h3 class="font-bold text-sm text-slate-200">SpO₂ Oxygen Saturation vs. Time (%)</h3>
+          </div>
+          <span class="text-xs text-slate-400 font-mono">Critical Boundary: &lt; 90% &bull; Warning: &lt; 95%</span>
+        </div>
+        <canvas id="chart-spo2" class="chart-canvas"></canvas>
+      </div>
+
+      <!-- Graph 3: Temperature vs Time -->
+      <div class="health-card p-5 mb-5">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-[#F59E0B]"></span>
+            <h3 class="font-bold text-sm text-slate-200">Body Temperature vs. Time (°C / °F)</h3>
+          </div>
+          <span class="text-xs text-slate-400 font-mono">Fever Threshold: &gt; 37.8°C (100.0°F)</span>
+        </div>
+        <canvas id="chart-temp" class="chart-canvas"></canvas>
+      </div>
+
+    </div>
+
+    <!-- ==========================================
+         5 & 6. ALERTS & SENSOR STATUS (2 COLUMNS)
+         ========================================== -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      
+      <!-- 5. Alerts and Notifications Panel -->
+      <div class="health-card p-5 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2.5">
+              <h2 class="font-bold text-sm text-white uppercase tracking-wider">Alerts &amp; Notifications</h2>
+              <span id="unacked-alerts-count" class="status-pill status-pill-warning text-[10px] px-2 py-0.2">
+                0
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="btn-ack-all-alerts" class="text-xs text-cyan-400 hover:underline font-semibold">
+                Ack All
+              </button>
+              <span class="text-slate-600">&bull;</span>
+              <button id="btn-clear-alerts" class="text-xs text-slate-400 hover:text-red-400">
+                Clear
+              </button>
+            </div>
+          </div>
+          <p class="text-xs text-slate-400 mb-3">
+            Threshold violations and sensor disconnect events. Configurable in settings.
+          </p>
+
+          <!-- Alert Items Scroll Container -->
+          <div id="alerts-container" class="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+            <!-- Dynamically populated via JS -->
+          </div>
+        </div>
+
+        <div class="pt-3 mt-3 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+          <span>Audio Synthesizer: Active</span>
+          <span class="text-teal-400 font-mono">Auto-recovery enabled</span>
+        </div>
+      </div>
+
+      <!-- 6. Hardware Sensor Status Section -->
+      <div class="health-card p-5 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-bold text-sm text-white uppercase tracking-wider">Hardware Sensor Telemetry</h2>
+            <span class="text-xs font-mono text-cyan-400">I2C / SPI / OneWire</span>
+          </div>
+          <p class="text-xs text-slate-400 mb-4">
+            Live peripheral health diagnostics from ESP32 hardware testbench:
+          </p>
+
+          <!-- Sensor Status Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            
+            <!-- MAX30100 -->
+            <div id="sensor-status-max30100" class="p-3 rounded-xl bg-[#16253B]/70 border border-slate-800 flex items-center gap-3">
+              <!-- Rendered via JS -->
+            </div>
+
+            <!-- Temperature Sensor -->
+            <div id="sensor-status-temp" class="p-3 rounded-xl bg-[#16253B]/70 border border-slate-800 flex items-center gap-3">
+              <!-- Rendered via JS -->
+            </div>
+
+            <!-- OLED Screen -->
+            <div id="sensor-status-oled" class="p-3 rounded-xl bg-[#16253B]/70 border border-slate-800 flex items-center gap-3">
+              <!-- Rendered via JS -->
+            </div>
+
+            <!-- ESP32 Core -->
+            <div id="sensor-status-esp32" class="p-3 rounded-xl bg-[#16253B]/70 border border-slate-800 flex items-center gap-3">
+              <!-- Rendered via JS -->
+            </div>
+
+            <!-- Wi-Fi Module -->
+            <div id="sensor-status-wifi" class="p-3 rounded-xl bg-[#16253B]/70 border border-slate-800 flex items-center gap-3">
+              <!-- Rendered via JS -->
+            </div>
+
+            <!-- SD Card Module -->
+            <div id="sensor-status-sd" class="p-3 rounded-xl bg-[#16253B]/70 border border-slate-800 flex items-center gap-3">
+              <!-- Rendered via JS -->
+            </div>
+
+          </div>
+        </div>
+
+        <div class="pt-3 mt-4 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+          <span>Bus Health: 400 kHz Fast-Mode I2C</span>
+          <span class="text-emerald-400 font-mono">No Bus Collisions</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ==========================================
+         7. LIVE DATA SECTION (TABLE)
+         ========================================== -->
+    <div class="health-card p-5 mb-8">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div>
+          <h2 class="font-bold text-sm text-white uppercase tracking-wider">Live Telemetry Feed</h2>
+          <p class="text-xs text-slate-400">Stream of raw sensor samples as received from the ESP32 microcontroller</p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button id="btn-toggle-autoscroll" class="btn-pill btn-outline text-xs px-2.5 py-1">
+            Auto-scroll: ON
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Table -->
+      <div class="overflow-x-auto max-h-72 overflow-y-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-slate-700 bg-[#16253B]/70 text-[11px] uppercase tracking-wider text-slate-400 font-bold sticky top-0 z-10">
+              <th class="py-2.5 px-3">Time</th>
+              <th class="py-2.5 px-3">Heart Rate</th>
+              <th class="py-2.5 px-3">SpO₂</th>
+              <th class="py-2.5 px-3">Temperature</th>
+              <th class="py-2.5 px-3">Health Status</th>
+              <th class="py-2.5 px-3">Battery</th>
+            </tr>
+          </thead>
+          <tbody id="live-table-body" class="divide-y divide-slate-800">
+            <!-- Dynamically populated via JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ==========================================
+         8. HISTORICAL DATA SECTION
+         ========================================== -->
+    <div class="health-card p-5 mb-8">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+        <div>
+          <h2 class="font-bold text-sm text-white uppercase tracking-wider">Historical Data &amp; Daily Analytics</h2>
+          <p class="text-xs text-slate-400">Review past 24-hour recorded sessions and daily aggregate averages</p>
+        </div>
+
+        <!-- Filter Controls -->
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <input type="date" id="history-date-picker" class="bg-[#16253B] text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-cyan-400">
+          <select id="history-time-range" class="bg-[#16253B] text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-cyan-400">
+            <option value="all">All Hours (24h)</option>
+            <option value="morning">Morning (06:00 - 12:00)</option>
+            <option value="afternoon">Afternoon (12:00 - 18:00)</option>
+            <option value="evening">Night / Evening (18:00 - 06:00)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Historical Aggregate Stats Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+        
+        <!-- Daily HR Avg -->
+        <div class="p-3.5 rounded-xl bg-[#16253B]/50 border border-slate-800">
+          <div class="text-[11px] text-slate-400 uppercase font-bold">Daily Avg Heart Rate</div>
+          <div id="hist-hr-avg" class="text-2xl font-bold font-mono text-red-400 mt-1">74 BPM</div>
+          <div id="hist-hr-minmax" class="text-[11px] text-slate-400 font-mono mt-0.5">Min: 62 | Max: 88</div>
+        </div>
+
+        <!-- Daily SpO2 Avg -->
+        <div class="p-3.5 rounded-xl bg-[#16253B]/50 border border-slate-800">
+          <div class="text-[11px] text-slate-400 uppercase font-bold">Daily Avg SpO₂</div>
+          <div id="hist-spo2-avg" class="text-2xl font-bold font-mono text-blue-400 mt-1">98.1%</div>
+          <div id="hist-spo2-minmax" class="text-[11px] text-slate-400 font-mono mt-0.5">Min: 96.5% | Max: 99.2%</div>
+        </div>
+
+        <!-- Daily Temp Avg -->
+        <div class="p-3.5 rounded-xl bg-[#16253B]/50 border border-slate-800">
+          <div class="text-[11px] text-slate-400 uppercase font-bold">Daily Avg Temperature</div>
+          <div id="hist-temp-avg" class="text-2xl font-bold font-mono text-amber-400 mt-1">36.6°C</div>
+          <div id="hist-temp-minmax" class="text-[11px] text-slate-400 font-mono mt-0.5">Min: 36.3°C | Max: 37.1°C</div>
+        </div>
+
+      </div>
+
+      <!-- Historical Table -->
+      <div class="overflow-x-auto max-h-60 overflow-y-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-slate-700 bg-[#16253B]/70 text-[11px] uppercase tracking-wider text-slate-400 font-bold sticky top-0">
+              <th class="py-2 px-3">Date &amp; Time</th>
+              <th class="py-2 px-3">Heart Rate</th>
+              <th class="py-2 px-3">SpO₂</th>
+              <th class="py-2 px-3">Temperature</th>
+              <th class="py-2 px-3">Status</th>
+            </tr>
+          </thead>
+          <tbody id="historical-table-body" class="divide-y divide-slate-800">
+            <!-- Dynamically populated via JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ==========================================
+         9 & 10. DATA LOGGING & DEVICE INFORMATION
+         ========================================== -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
+      
+      <!-- 9. Data Logging & SD Card Section -->
+      <div class="health-card p-5 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-bold text-sm text-white uppercase tracking-wider">Data Logging &amp; SD Storage</h2>
+            <span class="text-xs font-mono text-teal-400">MicroSD SPI FAT32</span>
+          </div>
+          <p class="text-xs text-slate-400 mb-4">
+            Manage wearable local storage buffers, export standard CSV files, or download structured JSON datasets:
+          </p>
+
+          <!-- Storage Space Bar -->
+          <div class="mb-5 p-3 rounded-xl bg-[#16253B]/60 border border-slate-800">
+            <div class="flex justify-between text-xs text-slate-300 font-semibold mb-1.5">
+              <span>SD Card Usage</span>
+              <span id="sd-storage-text" class="text-cyan-400 font-mono">1.45 GB / 16.0 GB (9.1%)</span>
+            </div>
+            <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+              <div id="sd-storage-bar" class="h-full bg-gradient-to-r from-teal-400 to-cyan-400 rounded-full" style="width: 9.1%"></div>
+            </div>
+            <div class="text-[11px] text-slate-400 font-mono mt-2 flex items-center justify-between">
+              <span>Write Speed: 1.2 MB/s</span>
+              <span>Buffer Sync: OK</span>
+            </div>
+          </div>
+
+          <!-- Logging Action Buttons -->
+          <div class="flex flex-wrap gap-2.5">
+            <button id="btn-export-csv" class="btn-pill btn-primary text-xs">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              Export CSV
+            </button>
+            <button id="btn-download-json" class="btn-pill btn-outline text-xs">
+              <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              Download JSON
+            </button>
+            <button id="btn-clear-data" class="btn-pill btn-outline text-xs text-red-400 border-red-500/30 hover:bg-red-500/10">
+              Clear Buffer
+            </button>
+          </div>
+        </div>
+
+        <div class="pt-3 mt-4 border-t border-slate-800 text-[11px] text-slate-400">
+          Format: RFC 4180 standard CSV compatible with Python pandas, Excel, and MATLAB.
+        </div>
+      </div>
+
+      <!-- 10. Device Information Panel -->
+      <div class="health-card p-5 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-bold text-sm text-white uppercase tracking-wider">Device System Information</h2>
+            <span id="device-info-status" class="text-xs font-mono text-emerald-400 font-bold">Online (Active)</span>
+          </div>
+          <p class="text-xs text-slate-400 mb-4">
+            ESP32 microcontroller hardware identifiers and runtime telemetry:
+          </p>
+
+          <div class="grid grid-cols-2 gap-3 text-xs font-mono">
+            <div class="p-2.5 rounded-lg bg-[#16253B]/50 border border-slate-800/80">
+              <div class="text-[10px] text-slate-400 font-sans uppercase font-bold">Device Name</div>
+              <div id="device-info-name" class="text-slate-200 font-semibold mt-0.5">ESP32-Wearable-Pro-V2</div>
+            </div>
+
+            <div class="p-2.5 rounded-lg bg-[#16253B]/50 border border-slate-800/80">
+              <div class="text-[10px] text-slate-400 font-sans uppercase font-bold">Firmware Version</div>
+              <div id="device-info-firmware" class="text-cyan-300 font-semibold mt-0.5">v2.4.1-ota</div>
+            </div>
+
+            <div class="p-2.5 rounded-lg bg-[#16253B]/50 border border-slate-800/80">
+              <div class="text-[10px] text-slate-400 font-sans uppercase font-bold">Device MAC / ID</div>
+              <div id="device-info-mac" class="text-slate-200 text-[11px] mt-0.5 truncate">40:22:D8:E5:A1:74</div>
+            </div>
+
+            <div class="p-2.5 rounded-lg bg-[#16253B]/50 border border-slate-800/80">
+              <div class="text-[10px] text-slate-400 font-sans uppercase font-bold">IP Address</div>
+              <div id="device-info-ip" class="text-teal-300 font-semibold mt-0.5">192.168.1.145</div>
+            </div>
+
+            <div class="p-2.5 rounded-lg bg-[#16253B]/50 border border-slate-800/80">
+              <div class="text-[10px] text-slate-400 font-sans uppercase font-bold">Battery &amp; Voltage</div>
+              <div id="device-info-battery" class="text-slate-200 mt-0.5">88% (4.08V Li-Po)</div>
+            </div>
+
+            <div class="p-2.5 rounded-lg bg-[#16253B]/50 border border-slate-800/80">
+              <div class="text-[10px] text-slate-400 font-sans uppercase font-bold">Last Sync Timestamp</div>
+              <div id="device-info-sync" class="text-slate-200 mt-0.5">10:05:39 AM</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-3 mt-4 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+          <span>FreeRTOS Core 0: Comm &bull; Core 1: DSP</span>
+          <span class="text-cyan-400 font-mono">Uptime: 04d 18h 32m</span>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- ==========================================
+       CRITICAL WARNING POP-UP MODAL
+       ========================================== -->
+  <div id="critical-alert-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden items-center justify-center p-4 transition-all duration-300">
+    <div class="relative w-full max-w-lg bg-[#0E1626] border-2 border-red-500 rounded-2xl p-6 sm:p-7 shadow-[0_0_55px_rgba(239,68,68,0.5)] critical-modal-glow overflow-hidden">
+      <!-- Pulsing Red Ambient Background Glows -->
+      <div class="absolute -top-24 -left-24 w-52 h-52 bg-red-600/25 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-24 -right-24 w-52 h-52 bg-red-600/20 rounded-full blur-3xl pointer-events-none"></div>
+
+      <!-- Close X Button -->
+      <button id="btn-close-critical-modal" class="absolute top-4 right-4 w-8 h-8 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-lg font-bold transition-all focus:outline-none" title="Close Alert">
+        &times;
+      </button>
+
+      <!-- Modal Header -->
+      <div class="flex items-start gap-4 mb-4 relative z-10">
+        <div class="w-13 h-13 rounded-2xl bg-red-500/20 border border-red-500/40 flex items-center justify-center flex-shrink-0 text-red-500 critical-icon-pulse p-3">
+          <!-- Red Warning / Alert Icon -->
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] uppercase font-extrabold tracking-widest px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/40">
+              HIGH PRIORITY
+            </span>
+            <span id="critical-modal-time" class="text-xs text-slate-400 font-mono">--:--:--</span>
+          </div>
+          <h2 class="text-2xl font-black tracking-tight text-white mt-1">
+            CRITICAL ALERT
+          </h2>
+          <p id="critical-modal-reason" class="text-sm font-semibold text-red-400 mt-1 flex items-center gap-1.5">
+            <span>⚠ SpO₂ has dropped below the safe limit</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Current Abnormal Readings Card -->
+      <div class="p-4 rounded-xl bg-[#141F32] border border-red-500/30 mb-5 relative z-10">
+        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center justify-between">
+          <span>Current Vital Readings</span>
+          <span class="text-[10px] text-red-400 font-mono animate-pulse">● ABNORMAL TELEMETRY</span>
+        </div>
+        
+        <div class="grid grid-cols-3 gap-2.5 text-center font-mono">
+          <!-- Heart Rate -->
+          <div id="critical-box-hr" class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-700/60 transition-all">
+            <div class="text-[10px] font-bold text-slate-400 uppercase font-sans">Heart Rate</div>
+            <div class="text-lg font-black text-white mt-0.5">
+              <span id="critical-val-hr">--</span> <span class="text-xs font-sans text-red-400 font-bold">BPM</span>
+            </div>
+          </div>
+
+          <!-- SpO2 -->
+          <div id="critical-box-spo2" class="p-2.5 rounded-lg bg-red-950/40 border border-red-500/50 transition-all">
+            <div class="text-[10px] font-bold text-red-400 uppercase font-sans">SpO₂</div>
+            <div class="text-lg font-black text-red-400 mt-0.5">
+              <span id="critical-val-spo2">--</span><span class="text-xs font-sans font-bold">%</span>
+            </div>
+          </div>
+
+          <!-- Temperature -->
+          <div id="critical-box-temp" class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-700/60 transition-all">
+            <div class="text-[10px] font-bold text-slate-400 uppercase font-sans">Temperature</div>
+            <div class="text-lg font-black text-white mt-0.5">
+              <span id="critical-val-temp">--</span><span id="critical-unit-temp" class="text-xs font-sans text-amber-400 font-bold">°C</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Footer -->
+      <div class="flex items-center justify-between gap-3 pt-2 relative z-10">
+        <span class="text-xs text-slate-400">
+          Threshold violation detected. Immediate attention recommended.
+        </span>
+        <button id="btn-ack-critical-modal" class="btn-pill px-6 py-2.5 bg-red-600 hover:bg-red-500 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl shadow-lg shadow-red-600/30 transition-all transform active:scale-95 flex items-center gap-2">
+          <span>✓</span>
+          <span>ACKNOWLEDGE</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       11. SETTINGS MODAL
+       ========================================== -->
+  <div id="settings-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="health-card max-w-xl w-full p-6 shadow-2xl border border-slate-700 max-h-[90vh] overflow-y-auto">
+      
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+        <h3 class="font-bold text-lg text-white flex items-center gap-2">
+          <span>⚙️ System Configuration &amp; Thresholds</span>
+        </h3>
+        <button id="btn-close-settings" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        
+        <!-- Threshold Limits Section -->
+        <div>
+          <h4 class="font-bold text-cyan-400 uppercase tracking-wider mb-2">Physiological Warning Thresholds</h4>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-slate-400 mb-1">Heart Rate Min (BPM):</label>
+              <input type="number" id="set-hr-min" class="w-full bg-[#16253B] text-slate-200 border border-slate-700 rounded p-2 focus:border-cyan-400">
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1">Heart Rate Max (BPM):</label>
+              <input type="number" id="set-hr-max" class="w-full bg-[#16253B] text-slate-200 border border-slate-700 rounded p-2 focus:border-cyan-400">
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1">SpO₂ Warning Limit (%):</label>
+              <input type="number" step="0.5" id="set-spo2-low" class="w-full bg-[#16253B] text-slate-200 border border-slate-700 rounded p-2 focus:border-cyan-400">
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1">SpO₂ Critical Limit (%):</label>
+              <input type="number" step="0.5" id="set-spo2-crit" class="w-full bg-[#16253B] text-slate-200 border border-slate-700 rounded p-2 focus:border-cyan-400">
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1">Temp Min Limit (°C):</label>
+              <input type="number" step="0.1" id="set-temp-min" class="w-full bg-[#16253B] text-slate-200 border border-slate-700 rounded p-2 focus:border-cyan-400">
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1">Temp Max Limit (°C):</label>
+              <input type="number" step="0.1" id="set-temp-max" class="w-full bg-[#16253B] text-slate-200 border border-slate-700 rounded p-2 focus:border-cyan-400">
+            </div>
+          </div>
+        </div>
+
+        <!-- Sampling & Device Section -->
+        <div class="pt-3 border-t border-slate-800">
+          <h4 class="font-bold text-teal-400 uppercase tracking-wider mb-2">Sampling &amp; Telemetry</h4>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-slate-400 mb-1">Data Sampling Interval:</label>
+              <select id="set-sample-rate" class="w-full bg-[#16253B] text-slate-200 border border-slate-700 rounded p-2 focus:border-cyan-400">
+                <option value="250">250 ms (Fastest)</option>
+                <option value="500">500 ms (Twice / sec)</option>
+                <option value="1000">1000 ms (1 Hz Standard)</option>
+                <option value="2000">2000 ms (Low Power)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1">Device Name:</label>
+              <input type="text" id="set-device-name" class="w-full bg-[#16253B] text-slate-200 border border-slate-700 rounded p-2 focus:border-cyan-400">
+            </div>
+          </div>
+        </div>
+
+        <!-- ESP32 Wi-Fi & Endpoint Settings -->
+        <div class="pt-3 border-t border-slate-800">
+          <h4 class="font-bold text-cyan-400 uppercase tracking-wider mb-2">ESP32 Hardware Network Address</h4>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="col-span-2 sm:col-span-1">
+              <label class="block text-slate-400 mb-1">ESP32 IP Address / Host:</label>
+              <input type="text" id="set-esp32-ip" class="w-full bg-[#16253B] text-slate-200 border border-slate-700 rounded p-2 focus:border-cyan-400 font-mono">
+            </div>
+            <div class="flex items-center gap-2 pt-5">
+              <input type="checkbox" id="set-audio-alerts" class="w-4 h-4 text-cyan-500 rounded bg-[#16253B] border-slate-700">
+              <label for="set-audio-alerts" class="text-slate-300 font-semibold cursor-pointer">Enable Audio Chimes</label>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center justify-between pt-5 border-t border-slate-800 mt-5">
+        <button id="btn-reset-settings" class="text-xs text-red-400 hover:underline">
+          Reset to Factory Defaults
+        </button>
+        <div class="flex gap-2">
+          <button onclick="closeSettingsModal()" class="btn-pill btn-outline text-xs px-3 py-1.5">
+            Cancel
+          </button>
+          <button id="btn-save-settings" class="btn-pill btn-primary text-xs px-4 py-1.5">
+            Save Settings
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ==========================================
+       FOOTER
+       ========================================== -->
+  <footer class="mt-auto border-t border-slate-800/80 py-4 px-4 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      <p>&copy; 2026 Wearable Health Monitoring Project &bull; ESP32 IoT Medical Prototype</p>
+      <p class="font-mono text-[11px] text-slate-400">ESP32 &bull; MAX30100 &bull; DS18B20 &bull; SSD1306 OLED</p>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="js/charts.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>
